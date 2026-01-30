@@ -35,16 +35,24 @@ export interface StreamEvent {
 
 export async function generateAIResponse(
   message: string,
-  schema: SchemaInfo,
+  schema: SchemaInfo | null,
   aiConfig: AIConfig,
   conversationHistory: Array<{ role: string; content: string }>
 ): Promise<{ content: string; sqlQuery?: string }> {
-  const schemaDescription = formatSchemaForAI(schema);
+  let fullSystemPrompt: string;
   
-  const fullSystemPrompt = `${SYSTEM_PROMPT}
+  if (schema) {
+    const schemaDescription = formatSchemaForAI(schema);
+    fullSystemPrompt = `${SYSTEM_PROMPT}
 
 DATABASE SCHEMA:
 ${schemaDescription}`;
+  } else {
+    fullSystemPrompt = `${SYSTEM_PROMPT}
+
+DATABASE SCHEMA:
+Unable to connect to the database to retrieve schema information. You can still have a general conversation about SQL and databases, but you cannot generate specific queries for this database until the connection is restored.`;
+  }
 
   if (aiConfig.provider === "anthropic") {
     return generateAnthropicResponse(message, fullSystemPrompt, aiConfig.apiKey, conversationHistory);
@@ -142,17 +150,25 @@ function extractSQLFromResponse(content: string): string | undefined {
 
 export async function streamAIResponse(
   message: string,
-  schema: SchemaInfo,
+  schema: SchemaInfo | null,
   aiConfig: AIConfig,
   conversationHistory: Array<{ role: string; content: string }>,
   res: Response
 ): Promise<{ content: string; sqlQuery?: string }> {
-  const schemaDescription = formatSchemaForAI(schema);
-
-  const fullSystemPrompt = `${SYSTEM_PROMPT}
+  let fullSystemPrompt: string;
+  
+  if (schema) {
+    const schemaDescription = formatSchemaForAI(schema);
+    fullSystemPrompt = `${SYSTEM_PROMPT}
 
 DATABASE SCHEMA:
 ${schemaDescription}`;
+  } else {
+    fullSystemPrompt = `${SYSTEM_PROMPT}
+
+DATABASE SCHEMA:
+Unable to connect to the database to retrieve schema information. You can still have a general conversation about SQL and databases, but you cannot generate specific queries for this database until the connection is restored.`; 
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");

@@ -147,8 +147,14 @@ export async function registerRoutes(
         content: message,
       });
 
-      // Get schema for AI context
-      const schema = await getDatabaseSchema(connection.connectionString);
+      // Get schema for AI context (gracefully handle connection failures)
+      let schema: Awaited<ReturnType<typeof getDatabaseSchema>> | null = null;
+      try {
+        schema = await getDatabaseSchema(connection.connectionString);
+      } catch (schemaError) {
+        console.log("Could not fetch schema, continuing without it:", (schemaError as Error).message);
+        schema = null;
+      }
 
       // Get conversation history
       const history = await storage.getChatMessages(connectionId);
@@ -216,8 +222,14 @@ export async function registerRoutes(
         content: message,
       });
 
-      // Get schema for AI context
-      const schema = await getDatabaseSchema(connection.connectionString);
+      // Get schema for AI context (gracefully handle connection failures)
+      let schema: Awaited<ReturnType<typeof getDatabaseSchema>> | null = null;
+      try {
+        schema = await getDatabaseSchema(connection.connectionString);
+      } catch (schemaError) {
+        console.log("Could not fetch schema, continuing without it:", (schemaError as Error).message);
+        schema = null;
+      }
 
       // Get conversation history
       const history = await storage.getChatMessages(connectionId);
