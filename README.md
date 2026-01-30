@@ -2,8 +2,6 @@
 
 A DBeaver-like database management tool with AI-powered natural language querying. Connect to PostgreSQL databases, explore schemas visually, and chat with AI to generate and execute SQL queries.
 
-![Main Interface](docs/screenshots/main-interface.png)
-
 ## Features
 
 - **Database Connections**: Add, edit, test, and manage PostgreSQL connection strings
@@ -13,18 +11,9 @@ A DBeaver-like database management tool with AI-powered natural language queryin
 - **Dual AI Support**: Choose between OpenAI (GPT-4o) or Anthropic (Claude Sonnet 4)
 - **Streaming Responses**: Real-time AI responses with thinking indicators
 - **Query Results**: Paginated table display with CSV export
+- **Quick Shortcuts**: One-click buttons for common queries (Latest 50, Count All, Structure, Relationships)
 - **Dark/Light Theme**: Toggle between themes with persistence
 - **Local Persistence**: Connections and chat history saved to localStorage
-
-## Screenshots
-
-### Adding a Database Connection
-![Add Connection](docs/screenshots/add-connection.png)
-*Dialog for adding a new PostgreSQL database connection with name and connection string*
-
-### Chatting with AI
-![Chat with AI](docs/screenshots/chat-with-ai.png)
-*Natural language conversation with AI to explore your database and generate SQL queries*
 
 ## Getting Started
 
