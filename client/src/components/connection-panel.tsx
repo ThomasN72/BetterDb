@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Database, Plus, Trash2, Check, Loader2, Pencil } from "lucide-react";
+import { removeConnectionFromStorage } from "@/hooks/use-local-storage-sync";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -128,10 +129,23 @@ export function ConnectionPanel({
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; connectionString: string }) => {
-      return apiRequest("POST", "/api/connections", data);
+      const response = await apiRequest("POST", "/api/connections", data);
+      return { response, originalData: data };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+    onSuccess: async ({ response, originalData }) => {
+      const newConnection = await response.json();
+      await queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+      
+      // Save to localStorage with full connection string (from form data)
+      const storedConnections = JSON.parse(localStorage.getItem("querymind_connections") || "[]");
+      storedConnections.push({
+        id: newConnection.id,
+        name: originalData.name,
+        connectionString: originalData.connectionString,
+        createdAt: newConnection.createdAt,
+      });
+      localStorage.setItem("querymind_connections", JSON.stringify(storedConnections));
+      
       form.reset();
       setDialogOpen(false);
       toast({
@@ -150,10 +164,19 @@ export function ConnectionPanel({
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { name: string; connectionString: string } }) => {
-      return apiRequest("PUT", `/api/connections/${id}`, data);
+      const response = await apiRequest("PUT", `/api/connections/${id}`, data);
+      return { id, data, response };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+    onSuccess: async ({ id, data: updatedData }) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+      
+      // Update localStorage directly from form data
+      const storedConnections = JSON.parse(localStorage.getItem("querymind_connections") || "[]");
+      const updated = storedConnections.map((c: any) =>
+        c.id === id ? { ...c, name: updatedData.name, connectionString: updatedData.connectionString } : c
+      );
+      localStorage.setItem("querymind_connections", JSON.stringify(updated));
+      
       form.reset();
       setDialogOpen(false);
       setEditingConnection(null);
@@ -177,6 +200,7 @@ export function ConnectionPanel({
     },
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+      removeConnectionFromStorage(deletedId);
       if (selectedConnectionId === deletedId) {
         onSelectConnection(null);
       }

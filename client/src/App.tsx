@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import { useEffect } from "react";
+import { useLocalStorageSync } from "@/hooks/use-local-storage-sync";
 
 function Router() {
   return (
@@ -14,6 +15,11 @@ function Router() {
       <Route component={NotFound} />
     </Switch>
   );
+}
+
+function LocalStorageHydration() {
+  useLocalStorageSync();
+  return null;
 }
 
 function App() {
@@ -29,6 +35,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <LocalStorageHydration />
         <Toaster />
         <Router />
       </TooltipProvider>

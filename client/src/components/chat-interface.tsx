@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { QueryResults } from "./query-results";
+import { saveMessagesToStorage } from "@/hooks/use-local-storage-sync";
 import type { ChatMessage, AIConfig } from "@shared/schema";
 
 interface StreamEvent {
@@ -278,6 +279,13 @@ export function ChatInterface({ connectionId, aiConfig, pendingQuery, onPendingQ
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isStreaming, streamingContent]);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (connectionId) {
+      saveMessagesToStorage(connectionId, messages);
+    }
+  }, [connectionId, messages]);
 
   // Handle pending query from table preview
   useEffect(() => {

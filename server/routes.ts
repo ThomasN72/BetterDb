@@ -273,6 +273,90 @@ export async function registerRoutes(
     }
   });
 
+  // Hydrate storage from localStorage (client-side persistence)
+  // This is a single-user local tool, so hydration is safe for localhost use
+  app.post("/api/hydrate", async (req, res) => {
+    try {
+      const { connections: storedConnections, messages: storedMessages } = req.body;
+      let connectionsRestored = 0;
+      let messagesRestored = 0;
+
+      // Validate and restore connections
+      if (Array.isArray(storedConnections)) {
+        for (const conn of storedConnections) {
+          // Validate required fields
+          if (
+            typeof conn.id !== "string" ||
+            typeof conn.name !== "string" ||
+            typeof conn.connectionString !== "string" ||
+            !conn.id || !conn.name || !conn.connectionString
+          ) {
+            continue;
+          }
+          
+          const exists = await storage.hasConnection(conn.id);
+          if (!exists) {
+            await storage.createConnectionWithId(
+              conn.id,
+              { name: conn.name, connectionString: conn.connectionString },
+              new Date(conn.createdAt || Date.now())
+            );
+            connectionsRestored++;
+          }
+        }
+      }
+
+      // Validate and restore messages
+      if (storedMessages && typeof storedMessages === "object") {
+        for (const [connectionId, msgs] of Object.entries(storedMessages)) {
+          if (!Array.isArray(msgs) || typeof connectionId !== "string") continue;
+          
+          // Check if connection exists before restoring messages
+          const connectionExists = await storage.hasConnection(connectionId);
+          if (!connectionExists) continue;
+          
+          const existingMessages = await storage.getChatMessages(connectionId);
+          const existingIds = new Set(existingMessages.map(m => m.id));
+          
+          for (const msg of msgs as any[]) {
+            // Validate required fields
+            if (
+              typeof msg.id !== "string" ||
+              typeof msg.role !== "string" ||
+              typeof msg.content !== "string" ||
+              !msg.id || !msg.role || !msg.content ||
+              !["user", "assistant"].includes(msg.role)
+            ) {
+              continue;
+            }
+            
+            // Skip if message already exists
+            if (existingIds.has(msg.id)) continue;
+            
+            await storage.createChatMessageWithId(
+              msg.id,
+              {
+                connectionId,
+                role: msg.role,
+                content: msg.content,
+                sqlQuery: typeof msg.sqlQuery === "string" ? msg.sqlQuery : null,
+                queryResults: Array.isArray(msg.queryResults) ? msg.queryResults : null,
+              },
+              new Date(msg.createdAt || Date.now())
+            );
+            messagesRestored++;
+          }
+        }
+      }
+
+      console.log(`[hydrate] Restored ${connectionsRestored} connections, ${messagesRestored} messages from localStorage`);
+      res.json({ success: true, connectionsRestored, messagesRestored });
+    } catch (error) {
+      console.error("Hydration error:", error);
+      res.status(500).json({ error: "Failed to hydrate from localStorage" });
+    }
+  });
+
   // Execute a query directly
   app.post("/api/connections/:id/query", async (req, res) => {
     try {
