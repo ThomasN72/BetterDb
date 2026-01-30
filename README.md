@@ -16,17 +16,8 @@ A DBeaver-like database management tool with AI-powered natural language queryin
 
 - Node.js 18 or higher
 - npm or yarn
-- PostgreSQL database (for app data storage)
 - OpenAI API key and/or Anthropic API key (for AI features)
-
-## Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/querymind
-SESSION_SECRET=your-session-secret-here
-```
+- PostgreSQL database (optional - for persistent storage)
 
 ## Installation
 
@@ -41,17 +32,31 @@ SESSION_SECRET=your-session-secret-here
    npm install
    ```
 
-3. Set up the database:
-   ```bash
-   npm run db:push
-   ```
-
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
 
-5. Open your browser and navigate to `http://localhost:5000`
+4. Open your browser and navigate to `http://localhost:5000`
+
+That's it! The app uses in-memory storage by default, so no database setup is required.
+
+## Optional: Persistent Storage with PostgreSQL
+
+If you want your connections and chat history to persist between restarts, you can use PostgreSQL:
+
+1. Create a `.env` file:
+   ```env
+   DATABASE_URL=postgresql://user:password@localhost:5432/querymind
+   USE_DATABASE=true
+   ```
+
+2. Set up the database tables:
+   ```bash
+   npm run db:push
+   ```
+
+3. Start the app with `npm run dev`
 
 ## Usage
 
