@@ -2,6 +2,8 @@
 
 A DBeaver-like database management tool with AI-powered natural language querying. Connect to PostgreSQL databases, explore schemas visually, and chat with AI to generate and execute SQL queries.
 
+![Main Interface](docs/screenshots/main-interface.png)
+
 ## Features
 
 - **Database Connections**: Add, edit, test, and manage PostgreSQL connection strings
@@ -12,15 +14,53 @@ A DBeaver-like database management tool with AI-powered natural language queryin
 - **Streaming Responses**: Real-time AI responses with thinking indicators
 - **Query Results**: Paginated table display with CSV export
 - **Dark/Light Theme**: Toggle between themes with persistence
+- **Local Persistence**: Connections and chat history saved to localStorage
 
-## Prerequisites
+## Screenshots
 
-- Node.js 18 or higher
-- npm or yarn
-- OpenAI API key and/or Anthropic API key (for AI features)
-- PostgreSQL database (optional - for persistent storage)
+### Adding a Database Connection
+![Add Connection](docs/screenshots/add-connection.png)
+*Dialog for adding a new PostgreSQL database connection with name and connection string*
+
+### Chatting with AI
+![Chat with AI](docs/screenshots/chat-with-ai.png)
+*Natural language conversation with AI to explore your database and generate SQL queries*
+
+## Getting Started
+
+### 1. Add a Database Connection
+
+1. Click the **+** button next to "Connections" in the sidebar
+2. Enter a name for your connection (e.g., "Production DB")
+3. Enter your PostgreSQL connection string:
+   ```
+   postgresql://username:password@host:port/database
+   ```
+4. Click **Save**
+
+> **Note**: The app runs on cloud servers, so you need a publicly accessible database. Local databases (localhost, 127.0.0.1) won't work from Replit.
+
+### 2. Configure AI Provider
+
+1. In the **AI Configuration** section, select your provider:
+   - **OpenAI** - Uses GPT-4o
+   - **Anthropic** - Uses Claude Sonnet 4
+2. Enter your API key
+3. The green indicator shows when the key is configured
+
+### 3. Start Chatting
+
+1. Click on your connection to select it
+2. The schema explorer will load your database tables
+3. Type a question in natural language, like:
+   - "What tables are in this database?"
+   - "Show me all users created this month"
+   - "Find the top 10 products by sales"
+4. The AI will generate and execute SQL queries for you
 
 ## Installation
+
+### Quick Start (No Database Required)
 
 1. Clone the repository:
    ```bash
@@ -38,13 +78,13 @@ A DBeaver-like database management tool with AI-powered natural language queryin
    npm run dev
    ```
 
-4. Open your browser and navigate to `http://localhost:5050`
+4. Open your browser and navigate to `http://localhost:5000`
 
-That's it! The app uses in-memory storage by default, so no database setup is required.
+The app uses in-memory storage by default with localStorage persistence, so no database setup is required.
 
-## Optional: Persistent Storage with PostgreSQL
+### Optional: PostgreSQL Persistence
 
-If you want your connections and chat history to persist between restarts, you can use PostgreSQL:
+If you want server-side persistence between restarts:
 
 1. Create a `.env` file:
    ```env
@@ -57,46 +97,13 @@ If you want your connections and chat history to persist between restarts, you c
    npm run db:push
    ```
 
-3. Start the app with `npm run dev`
-
-## Usage
-
-### Adding a Database Connection
-
-1. Click the "+" button in the Connections section of the sidebar
-2. Enter a name for your connection
-3. Choose input mode:
-   - **Individual Fields**: Enter host, port, database name, username, and password separately
-   - **Full URL**: Paste your complete PostgreSQL connection string
-4. Click "Save Connection"
-
-### Configuring AI
-
-1. Expand the "AI Configuration" section in the sidebar
-2. Select your AI provider (OpenAI or Anthropic)
-3. Enter your API key
-4. Click "Save"
-
-### Exploring Database Schema
-
-1. Select a connection from the sidebar
-2. The Schema Explorer will display all tables
-3. Expand tables to see columns, data types, primary keys, and foreign key relationships
-
-### Chatting with AI
-
-1. Select a connection and configure AI settings
-2. Type natural language questions in the chat input
-3. The AI will generate SQL queries based on your database schema
-4. Review and execute the generated queries
-5. View results in the paginated table below
-
-### Example Queries
+## Example Queries
 
 - "Show me all tables in the database"
 - "What are the top 10 customers by order count?"
 - "Find all products with price greater than $100"
 - "Show the relationship between orders and customers"
+- "Count records in each table"
 
 ## Tech Stack
 
@@ -136,15 +143,15 @@ shared/
 | POST | `/api/connections/:id/test` | Test connection |
 | GET | `/api/connections/:id/schema` | Get database schema |
 | GET | `/api/chat/:connectionId/messages` | Get chat history |
-| POST | `/api/chat` | Send chat message |
+| POST | `/api/chat/stream` | Send chat message (streaming) |
 | POST | `/api/connections/:id/query` | Execute raw SQL |
 
 ## Security Notes
 
-- Database connection strings are stored encrypted
+- Database connection strings are stored securely and masked in the UI
 - API keys are only sent per-request, not stored server-side
 - Destructive queries (DROP, TRUNCATE, unfiltered DELETE) are blocked by default
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
