@@ -29,6 +29,8 @@ interface StreamEvent {
 interface ChatInterfaceProps {
   connectionId: string | null;
   aiConfig: AIConfig;
+  pendingQuery?: string | null;
+  onPendingQueryHandled?: () => void;
 }
 
 function SQLCodeBlock({ sql, onExecute }: { sql: string; onExecute?: () => void }) {
@@ -144,7 +146,7 @@ function ChatMessageItem({
   );
 }
 
-export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
+export function ChatInterface({ connectionId, aiConfig, pendingQuery, onPendingQueryHandled }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [thinkingStatus, setThinkingStatus] = useState<string | null>(null);
@@ -276,6 +278,46 @@ export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isStreaming, streamingContent]);
+
+  // Handle pending query from table preview
+  useEffect(() => {
+    if (!pendingQuery) return;
+
+    // Always clear the pending query after handling
+    const clearQuery = () => onPendingQueryHandled?.();
+
+    if (!connectionId) {
+      toast({
+        title: "No database connected",
+        description: "Please select a database connection first.",
+        variant: "destructive",
+      });
+      clearQuery();
+      return;
+    }
+
+    if (!aiConfig.apiKey) {
+      toast({
+        title: "API key required",
+        description: "Please configure your AI provider API key in the sidebar.",
+        variant: "destructive",
+      });
+      clearQuery();
+      return;
+    }
+
+    if (isStreaming) {
+      toast({
+        title: "Please wait",
+        description: "A query is already in progress. Please try again when it completes.",
+      });
+      clearQuery();
+      return;
+    }
+
+    sendStreamingMessage(pendingQuery);
+    clearQuery();
+  }, [pendingQuery, connectionId, aiConfig.apiKey, isStreaming, sendStreamingMessage, onPendingQueryHandled, toast]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

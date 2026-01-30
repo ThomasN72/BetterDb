@@ -16,6 +16,7 @@ interface AppSidebarProps {
   onSelectConnection: (id: string | null) => void;
   aiConfig: AIConfig;
   onAIConfigChange: (config: AIConfig) => void;
+  onPreviewTable?: (tableName: string) => void;
 }
 
 export function AppSidebar({
@@ -23,6 +24,7 @@ export function AppSidebar({
   onSelectConnection,
   aiConfig,
   onAIConfigChange,
+  onPreviewTable,
 }: AppSidebarProps) {
   return (
     <Sidebar>
@@ -50,7 +52,7 @@ export function AppSidebar({
 
         <SidebarSeparator className="my-4" />
 
-        <SchemaExplorer connectionId={selectedConnectionId} />
+        <SchemaExplorer connectionId={selectedConnectionId} onPreviewTable={onPreviewTable} />
       </SidebarContent>
 
       <SidebarFooter className="p-3">
