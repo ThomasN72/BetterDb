@@ -7,7 +7,7 @@ import {
   getDatabaseSchema,
   executeQuery,
 } from "./database-service";
-import { generateAIResponse } from "./ai-service";
+import { generateAIResponse, streamAIResponse } from "./ai-service";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -191,6 +191,85 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Chat error:", error);
       res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  // Send a chat message with streaming
+  app.post("/api/chat/stream", async (req, res) => {
+    try {
+      const parsed = chatRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      const { connectionId, message, aiConfig } = parsed.data;
+
+      const connection = await storage.getConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+
+      // Save user message
+      await storage.createChatMessage({
+        connectionId,
+        role: "user",
+        content: message,
+      });
+
+      // Get schema for AI context
+      const schema = await getDatabaseSchema(connection.connectionString);
+
+      // Get conversation history
+      const history = await storage.getChatMessages(connectionId);
+      const conversationHistory = history.slice(-10).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // Stream AI response (returns content, doesn't send "done" yet)
+      const aiResponse = await streamAIResponse(
+        message,
+        schema,
+        aiConfig,
+        conversationHistory.slice(0, -1),
+        res
+      );
+
+      // Execute SQL if generated
+      let queryResults: Record<string, unknown>[] | undefined;
+      if (aiResponse.sqlQuery) {
+        try {
+          queryResults = await executeQuery(
+            connection.connectionString,
+            aiResponse.sqlQuery
+          );
+          // Send query results
+          res.write(`data: ${JSON.stringify({ type: "queryResults", data: queryResults })}\n\n`);
+        } catch (error) {
+          res.write(`data: ${JSON.stringify({ type: "queryError", data: (error as Error).message })}\n\n`);
+        }
+      }
+
+      // Save AI response
+      await storage.createChatMessage({
+        connectionId,
+        role: "assistant",
+        content: aiResponse.content,
+        sqlQuery: aiResponse.sqlQuery,
+        queryResults: queryResults || null,
+      });
+
+      // Send final done event after all processing
+      res.write(`data: ${JSON.stringify({ type: "done", data: "" })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("Stream chat error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: (error as Error).message });
+      } else {
+        res.write(`data: ${JSON.stringify({ type: "error", data: (error as Error).message })}\n\n`);
+        res.end();
+      }
     }
   });
 

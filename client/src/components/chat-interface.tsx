@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Send,
   Loader2,
@@ -12,15 +11,20 @@ import {
   Sparkles,
   Database,
   AlertCircle,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { QueryResults } from "./query-results";
 import type { ChatMessage, AIConfig } from "@shared/schema";
+
+interface StreamEvent {
+  type: "thinking" | "content" | "done" | "error" | "queryResults" | "queryError";
+  data: string | Record<string, unknown>[];
+}
 
 interface ChatInterfaceProps {
   connectionId: string | null;
@@ -142,6 +146,11 @@ function ChatMessageItem({
 
 export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [thinkingStatus, setThinkingStatus] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingQueryResults, setStreamingQueryResults] = useState<Record<string, unknown>[] | null>(null);
+  const [streamingQueryError, setStreamingQueryError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -158,37 +167,119 @@ export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
     enabled: !!connectionId,
   });
 
-  const chatMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const res = await apiRequest("POST", "/api/chat", {
-        connectionId,
-        message,
-        aiConfig,
+  const sendStreamingMessage = useCallback(async (message: string) => {
+    if (!connectionId) return;
+
+    setIsStreaming(true);
+    setThinkingStatus("Connecting to AI...");
+    setStreamingContent("");
+    setStreamingQueryResults(null);
+    setStreamingQueryError(null);
+
+    try {
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId, message, aiConfig }),
       });
-      return res.json();
-    },
-    onSuccess: () => {
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send message");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      let buffer = "";
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        
+        // SSE events are separated by double newlines
+        const events = buffer.split("\n\n");
+        // Keep the last incomplete chunk in the buffer
+        buffer = events.pop() || "";
+
+        for (const eventBlock of events) {
+          if (!eventBlock.trim()) continue;
+          
+          // Extract data from SSE event format
+          const lines = eventBlock.split("\n");
+          let data = "";
+          
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              data += line.slice(6);
+            }
+          }
+          
+          if (!data) continue;
+          
+          try {
+            const event: StreamEvent = JSON.parse(data);
+
+            switch (event.type) {
+              case "thinking":
+                setThinkingStatus(event.data as string);
+                break;
+              case "content":
+                setThinkingStatus(null);
+                setStreamingContent((prev) => prev + (event.data as string));
+                break;
+              case "queryResults":
+                setStreamingQueryResults(event.data as Record<string, unknown>[]);
+                break;
+              case "queryError":
+                setStreamingQueryError(event.data as string);
+                break;
+              case "done":
+                streamDone = true;
+                break;
+              case "error":
+                throw new Error(event.data as string);
+            }
+          } catch (parseError) {
+            console.warn("Failed to parse SSE event:", data, parseError);
+          }
+        }
+      }
+
+      // Refresh messages after streaming is complete
       queryClient.invalidateQueries({ queryKey: ["/api/chat", connectionId] });
       setInput("");
-    },
-    onError: (error: Error) => {
+    } catch (error) {
       toast({
         title: "Failed to send message",
-        description: error.message,
+        description: (error as Error).message,
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsStreaming(false);
+      setThinkingStatus(null);
+      setStreamingContent("");
+      setStreamingQueryResults(null);
+      setStreamingQueryError(null);
+    }
+  }, [connectionId, aiConfig, queryClient, toast]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, chatMutation.isPending]);
+  }, [messages, isStreaming, streamingContent]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !connectionId || chatMutation.isPending) return;
+    if (!input.trim() || !connectionId || isStreaming) return;
     if (!aiConfig.apiKey) {
       toast({
         title: "API key required",
@@ -197,7 +288,7 @@ export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
       });
       return;
     }
-    chatMutation.mutate(input.trim());
+    sendStreamingMessage(input.trim());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -284,17 +375,43 @@ export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
             {messages.map((msg) => (
               <ChatMessageItem key={msg.id} message={msg} />
             ))}
-            {chatMutation.isPending && (
-              <div className="flex gap-3">
+            {isStreaming && (
+              <div className="flex gap-3" data-testid="streaming-message">
                 <div className="shrink-0 h-8 w-8 rounded-full bg-accent flex items-center justify-center">
                   <Bot className="h-4 w-4" />
                 </div>
                 <Card className="max-w-[85%] bg-card">
                   <CardContent className="p-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Analyzing your question...</span>
-                    </div>
+                    {thinkingStatus && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2" data-testid="thinking-indicator">
+                        <Brain className="h-4 w-4 animate-pulse text-primary" />
+                        <span className="italic">{thinkingStatus}</span>
+                      </div>
+                    )}
+                    {streamingContent && (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                          {streamingContent}
+                          <span className="inline-block w-2 h-4 ml-1 bg-primary animate-pulse" />
+                        </p>
+                      </div>
+                    )}
+                    {!thinkingStatus && !streamingContent && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Processing...</span>
+                      </div>
+                    )}
+                    {streamingQueryResults && (
+                      <div className="mt-3">
+                        <QueryResults results={streamingQueryResults} />
+                      </div>
+                    )}
+                    {streamingQueryError && (
+                      <div className="mt-3 p-2 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                        Query Error: {streamingQueryError}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -312,16 +429,16 @@ export function ChatInterface({ connectionId, aiConfig }: ChatInterfaceProps) {
             onKeyDown={handleKeyDown}
             placeholder="Ask a question about your database..."
             className="min-h-[44px] max-h-[120px] resize-none"
-            disabled={chatMutation.isPending}
+            disabled={isStreaming}
             data-testid="input-chat-message"
           />
           <Button
             type="submit"
             size="icon"
-            disabled={!input.trim() || chatMutation.isPending}
+            disabled={!input.trim() || isStreaming}
             data-testid="button-send-message"
           >
-            {chatMutation.isPending ? (
+            {isStreaming ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { AIConfig, SchemaInfo } from "@shared/schema";
+import type { Response } from "express";
 
 const SYSTEM_PROMPT = `You are an expert SQL database assistant. Your role is to help users explore and query their database using natural language.
 
@@ -26,6 +27,11 @@ Format your response as:
 3. Explanation of what the query does
 
 If the user asks a question that doesn't require SQL (like explaining a concept or clarifying schema), respond conversationally without generating a query.`;
+
+export interface StreamEvent {
+  type: "thinking" | "content" | "done" | "error";
+  data: string;
+}
 
 export async function generateAIResponse(
   message: string,
@@ -132,4 +138,126 @@ function extractSQLFromResponse(content: string): string | undefined {
     return sqlMatch[1].trim();
   }
   return undefined;
+}
+
+export async function streamAIResponse(
+  message: string,
+  schema: SchemaInfo,
+  aiConfig: AIConfig,
+  conversationHistory: Array<{ role: string; content: string }>,
+  res: Response
+): Promise<{ content: string; sqlQuery?: string }> {
+  const schemaDescription = formatSchemaForAI(schema);
+
+  const fullSystemPrompt = `${SYSTEM_PROMPT}
+
+DATABASE SCHEMA:
+${schemaDescription}`;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  const sendEvent = (event: StreamEvent) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  sendEvent({ type: "thinking", data: "Analyzing your question and database schema..." });
+
+  try {
+    let fullContent = "";
+
+    if (aiConfig.provider === "anthropic") {
+      fullContent = await streamAnthropicResponse(message, fullSystemPrompt, aiConfig.apiKey, conversationHistory, sendEvent);
+    } else {
+      fullContent = await streamOpenAIResponse(message, fullSystemPrompt, aiConfig.apiKey, conversationHistory, sendEvent);
+    }
+
+    const sqlQuery = extractSQLFromResponse(fullContent);
+    // Note: "done" event is sent by the route after query execution
+
+    return { content: fullContent, sqlQuery };
+  } catch (error) {
+    sendEvent({ type: "error", data: (error as Error).message });
+    throw error;
+  }
+}
+
+async function streamAnthropicResponse(
+  message: string,
+  systemPrompt: string,
+  apiKey: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+  sendEvent: (event: StreamEvent) => void
+): Promise<string> {
+  const client = new Anthropic({ apiKey });
+
+  const messages = [
+    ...conversationHistory.map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+    })),
+    { role: "user" as const, content: message },
+  ];
+
+  sendEvent({ type: "thinking", data: "Generating response with Claude..." });
+
+  const stream = await client.messages.stream({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages,
+  });
+
+  let fullContent = "";
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      const text = event.delta.text;
+      fullContent += text;
+      sendEvent({ type: "content", data: text });
+    }
+  }
+
+  return fullContent;
+}
+
+async function streamOpenAIResponse(
+  message: string,
+  systemPrompt: string,
+  apiKey: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+  sendEvent: (event: StreamEvent) => void
+): Promise<string> {
+  const client = new OpenAI({ apiKey });
+
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory.map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+    })),
+    { role: "user", content: message },
+  ];
+
+  sendEvent({ type: "thinking", data: "Generating response with GPT-4o..." });
+
+  const stream = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    max_tokens: 2048,
+    stream: true,
+  });
+
+  let fullContent = "";
+
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content || "";
+    if (text) {
+      fullContent += text;
+      sendEvent({ type: "content", data: text });
+    }
+  }
+
+  return fullContent;
 }
