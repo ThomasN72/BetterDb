@@ -215,12 +215,24 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Connection not found" });
       }
 
+      // Set up SSE headers immediately so client sees response starting
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      // Send immediate thinking status
+      res.write(`data: ${JSON.stringify({ type: "thinking", data: "Processing your request..." })}\n\n`);
+
       // Save user message
       await storage.createChatMessage({
         connectionId,
         role: "user",
         content: message,
       });
+
+      // Send status update while fetching schema
+      res.write(`data: ${JSON.stringify({ type: "thinking", data: "Analyzing database schema..." })}\n\n`);
 
       // Get schema for AI context (gracefully handle connection failures)
       let schema: Awaited<ReturnType<typeof getDatabaseSchema>> | null = null;
@@ -237,6 +249,9 @@ export async function registerRoutes(
         role: msg.role,
         content: msg.content,
       }));
+
+      // Send status update before AI call
+      res.write(`data: ${JSON.stringify({ type: "thinking", data: "Generating response..." })}\n\n`);
 
       // Stream AI response (returns content, doesn't send "done" yet)
       const aiResponse = await streamAIResponse(

@@ -170,15 +170,12 @@ DATABASE SCHEMA:
 Unable to connect to the database to retrieve schema information. You can still have a general conversation about SQL and databases, but you cannot generate specific queries for this database until the connection is restored.`; 
   }
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
+  // SSE headers are already set by the route handler
   const sendEvent = (event: StreamEvent) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
-  sendEvent({ type: "thinking", data: "Analyzing your question and database schema..." });
+  sendEvent({ type: "thinking", data: "Connecting to AI..." });
 
   try {
     let fullContent = "";
