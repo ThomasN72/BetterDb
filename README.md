@@ -37,7 +37,7 @@ A DBeaver-like database management tool with AI-powered natural language queryin
    npm run dev
    ```
 
-4. Open your browser and navigate to `http://localhost:5000`
+4. Open your browser and navigate to `http://localhost:5050`
 
 That's it! The app uses in-memory storage by default, so no database setup is required.
 
