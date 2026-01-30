@@ -13,6 +13,7 @@ export interface IStorage {
   getConnections(): Promise<Connection[]>;
   getConnection(id: string): Promise<Connection | undefined>;
   createConnection(data: InsertConnection): Promise<Connection>;
+  updateConnection(id: string, data: InsertConnection): Promise<Connection | undefined>;
   deleteConnection(id: string): Promise<void>;
   getChatMessages(connectionId: string): Promise<ChatMessage[]>;
   createChatMessage(data: InsertChatMessage): Promise<ChatMessage>;
@@ -35,6 +36,15 @@ export class DatabaseStorage implements IStorage {
 
   async createConnection(data: InsertConnection): Promise<Connection> {
     const result = await db.insert(connections).values(data).returning();
+    return result[0];
+  }
+
+  async updateConnection(id: string, data: InsertConnection): Promise<Connection | undefined> {
+    const result = await db
+      .update(connections)
+      .set(data)
+      .where(eq(connections.id, id))
+      .returning();
     return result[0];
   }
 

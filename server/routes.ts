@@ -44,6 +44,39 @@ export async function registerRoutes(
     }
   });
 
+  // Get connection details (for editing)
+  app.get("/api/connections/:id/details", async (req, res) => {
+    try {
+      const connection = await storage.getConnection(req.params.id);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+      res.json(connection);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch connection" });
+    }
+  });
+
+  // Update a connection
+  app.put("/api/connections/:id", async (req, res) => {
+    try {
+      const parsed = insertConnectionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const connection = await storage.updateConnection(req.params.id, parsed.data);
+      if (!connection) {
+        return res.status(404).json({ error: "Connection not found" });
+      }
+      res.json({
+        ...connection,
+        connectionString: "***hidden***",
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update connection" });
+    }
+  });
+
   // Delete a connection
   app.delete("/api/connections/:id", async (req, res) => {
     try {
