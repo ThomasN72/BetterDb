@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ChatInterface } from "@/components/chat-interface";
@@ -7,7 +7,6 @@ import type { AIConfig } from "@shared/schema";
 
 export default function Home() {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [aiConfig, setAIConfig] = useState<AIConfig>(() => {
     const saved = localStorage.getItem("aiConfig");
     if (saved) {
@@ -24,14 +23,6 @@ export default function Home() {
     localStorage.setItem("aiConfig", JSON.stringify(aiConfig));
   }, [aiConfig]);
 
-  const handlePreviewTable = useCallback((tableName: string) => {
-    setPendingQuery(`Show me the first 50 rows from the "${tableName}" table`);
-  }, []);
-
-  const handlePendingQueryHandled = useCallback(() => {
-    setPendingQuery(null);
-  }, []);
-
   const style = {
     "--sidebar-width": "18rem",
     "--sidebar-width-icon": "4rem",
@@ -45,7 +36,6 @@ export default function Home() {
           onSelectConnection={setSelectedConnectionId}
           aiConfig={aiConfig}
           onAIConfigChange={setAIConfig}
-          onPreviewTable={handlePreviewTable}
         />
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-card/50">
@@ -62,8 +52,6 @@ export default function Home() {
             <ChatInterface
               connectionId={selectedConnectionId}
               aiConfig={aiConfig}
-              pendingQuery={pendingQuery}
-              onPendingQueryHandled={handlePendingQueryHandled}
             />
           </main>
         </div>
