@@ -9,6 +9,7 @@ A DBeaver-like database management tool with AI-powered natural language queryin
 - **Schema Explorer**: Visual tree view of tables, columns, primary keys, and foreign key relationships
 - **AI Chat Interface**: Natural language queries that generate and execute SQL
 - **Dual AI Support**: Choose between OpenAI (GPT-4o) or Anthropic (Claude Sonnet 4)
+- **Streaming Responses**: Real-time AI responses with thinking indicators
 - **Query Results**: Paginated table display with CSV export
 - **Dark/Light Theme**: Toggle between themes with persistence
 
