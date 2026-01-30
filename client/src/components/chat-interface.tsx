@@ -12,6 +12,10 @@ import {
   Database,
   AlertCircle,
   Brain,
+  Clock,
+  Hash,
+  Table2,
+  ListOrdered,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -470,31 +474,94 @@ export function ChatInterface({ connectionId, aiConfig, pendingQuery, onPendingQ
         )}
       </ScrollArea>
 
-      <div className="p-4 border-t border-border bg-card/50">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your database..."
-            className="min-h-[44px] max-h-[120px] resize-none"
-            disabled={isStreaming}
-            data-testid="input-chat-message"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!input.trim() || isStreaming}
-            data-testid="button-send-message"
-          >
-            {isStreaming ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
+      <div className="border-t border-border bg-card/50">
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center gap-1 flex-wrap text-xs text-muted-foreground mb-2">
+            <span className="mr-1">Quick:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => {
+                setInput("Show me the latest 50 entries from each table, ordered by most recent first");
+                textareaRef.current?.focus();
+              }}
+              disabled={isStreaming}
+              data-testid="shortcut-latest-50"
+            >
+              <Clock className="h-3 w-3" />
+              Latest 50
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => {
+                setInput("Count the total number of records in each table");
+                textareaRef.current?.focus();
+              }}
+              disabled={isStreaming}
+              data-testid="shortcut-count"
+            >
+              <Hash className="h-3 w-3" />
+              Count All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => {
+                setInput("Show me the structure of all tables including column types and constraints");
+                textareaRef.current?.focus();
+              }}
+              disabled={isStreaming}
+              data-testid="shortcut-structure"
+            >
+              <Table2 className="h-3 w-3" />
+              Structure
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => {
+                setInput("List all tables and show how they're related through foreign keys");
+                textareaRef.current?.focus();
+              }}
+              disabled={isStreaming}
+              data-testid="shortcut-relationships"
+            >
+              <ListOrdered className="h-3 w-3" />
+              Relationships
+            </Button>
+          </div>
+        </div>
+        <div className="px-4 pb-4">
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask a question about your database..."
+              className="min-h-[44px] max-h-[120px] resize-none"
+              disabled={isStreaming}
+              data-testid="input-chat-message"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim() || isStreaming}
+              data-testid="button-send-message"
+            >
+              {isStreaming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );
