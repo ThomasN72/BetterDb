@@ -27,7 +27,7 @@ A DBeaver-like database management tool with AI-powered natural language queryin
    ```
 4. Click **Save**
 
-> **Note**: The app runs on cloud servers, so you need a publicly accessible database. Local databases (localhost, 127.0.0.1) won't work from Replit.
+> **Note**: The app runs on cloud servers, so you need a publicly accessible database. Local databases (localhost, 127.0.0.1) won't work unless you're running the app locally.
 
 ### 2. Configure AI Provider
 
